@@ -1,10 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card } from '../components/UI';
 import { Icon } from '../components/Icons';
-
-import '../lib/firebase';
+import { db, appId } from '../lib/firebase';
 import {
-  getFirestore,
   collection,
   query,
   orderBy,
@@ -29,7 +27,7 @@ type Task = {
   date?: string | null;              // YYYY-MM-DD
   time?: string | null;              // HH:MM (24h)
   list?: string | null;              // list name; null = Inbox
-  recurrence?: Recurrence | null;    // see type below
+  recurrence?: Recurrence | null;
   createdAt?: any;
 };
 
@@ -45,12 +43,12 @@ type Recurrence = {
   unit: 'day' | 'week' | 'month' | 'year';
   starts: string;                      // YYYY-MM-DD
   time?: string | null;                // HH:MM optional
-  ends: { type: 'never' } |
-        { type: 'on', date: string } |
-        { type: 'after', count: number };
+  ends:
+    | { type: 'never' }
+    | { type: 'on'; date: string }
+    | { type: 'after'; count: number };
 };
 
-const db = getFirestore();
 const DEFAULT_LIST = 'Inbox';
 
 /* ===================================================================================== */
@@ -63,10 +61,15 @@ export default function ProjectsView({ user }: Props) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
+  const listsPath = (uid: string) =>
+    ['artifacts', appId, 'users', uid, 'lists'] as const;
+  const tasksPath = (uid: string) =>
+    ['artifacts', appId, 'users', uid, 'tasks'] as const;
+
   /* --------- LISTS --------- */
   useEffect(() => {
     if (!user?.uid) return;
-    const colRef = collection(db, 'users', user.uid, 'lists');
+    const colRef = collection(db, ...listsPath(user.uid));
     const qy = query(colRef, orderBy('createdAt', 'asc'));
     return onSnapshot(
       qy,
@@ -86,7 +89,7 @@ export default function ProjectsView({ user }: Props) {
     if (!user?.uid) return;
     setLoading(true);
     setErr(null);
-    const colRef = collection(db, 'users', user.uid, 'tasks');
+    const colRef = collection(db, ...tasksPath(user.uid));
     const qy = query(colRef, orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(
       qy,
@@ -161,7 +164,7 @@ export default function ProjectsView({ user }: Props) {
     const name = (nameRaw || '').trim();
     if (!user?.uid || !name) return;
     try {
-      await addDoc(collection(db, 'users', user.uid, 'lists'), {
+      await addDoc(collection(db, ...listsPath(user.uid)), {
         name,
         createdAt: serverTimestamp(),
       });
@@ -176,11 +179,11 @@ export default function ProjectsView({ user }: Props) {
     if (!user?.uid || !newName || newName === oldName) return;
     try {
       const ld = lists.find((l) => l.name === oldName);
-      if (ld) await updateDoc(doc(db, 'users', user.uid, 'lists', ld.id), { name: newName });
+      if (ld) await updateDoc(doc(db, ...listsPath(user.uid), ld.id), { name: newName });
 
       const toUpdate = tasks.filter((t) => (t.list || DEFAULT_LIST) === oldName);
       for (const t of toUpdate) {
-        await updateDoc(doc(db, 'users', user.uid, 'tasks', t.id), { list: newName });
+        await updateDoc(doc(db, ...tasksPath(user.uid), t.id), { list: newName });
       }
     } catch (e: any) {
       console.error('renameList error:', e);
@@ -196,7 +199,7 @@ export default function ProjectsView({ user }: Props) {
     const text = (textRaw || '').trim();
     if (!user?.uid || !text) return;
     try {
-      await addDoc(collection(db, 'users', user.uid, 'tasks'), {
+      await addDoc(collection(db, ...tasksPath(user.uid)), {
         text,
         status: 'active',
         difficulty: 'Medium',
@@ -215,7 +218,7 @@ export default function ProjectsView({ user }: Props) {
   async function toggleDone(t: Task, done: boolean) {
     if (!user?.uid || !t?.id) return;
     try {
-      await updateDoc(doc(db, 'users', user.uid, 'tasks', t.id), {
+      await updateDoc(doc(db, ...tasksPath(user.uid), t.id), {
         status: done ? 'done' : 'active',
         completedAt: done ? serverTimestamp() : null,
       });
@@ -228,7 +231,7 @@ export default function ProjectsView({ user }: Props) {
   async function deleteTask(t: Task) {
     if (!user?.uid || !t?.id) return;
     try {
-      await deleteDoc(doc(db, 'users', user.uid, 'tasks', t.id));
+      await deleteDoc(doc(db, ...tasksPath(user.uid), t.id));
     } catch (e: any) {
       console.error('deleteTask error:', e);
       setErr(e?.message || 'Failed to delete task');
@@ -237,20 +240,18 @@ export default function ProjectsView({ user }: Props) {
 
   async function deleteList(listName: string) {
     if (!user?.uid) return;
-    const confirm = window.confirm(
+    const ok = window.confirm(
       `Delete the list “${listName}” and all its tasks? This cannot be undone.`
     );
-    if (!confirm) return;
+    if (!ok) return;
     try {
       const ld = lists.find((l) => l.name === listName);
-      if (ld) await deleteDoc(doc(db, 'users', user.uid, 'lists', ld.id));
+      if (ld) await deleteDoc(doc(db, ...listsPath(user.uid), ld.id));
 
-      const tasksCol = collection(db, 'users', user.uid, 'tasks');
-      // list == listName
+      const tasksCol = collection(db, ...tasksPath(user.uid));
       const snap1 = await getDocs(query(tasksCol, where('list', '==', listName)));
       for (const d of snap1.docs) await deleteDoc(d.ref);
 
-      // if deleting Inbox => also list == null
       if (listName === DEFAULT_LIST) {
         const snapNull = await getDocs(query(tasksCol, where('list', '==', null)));
         for (const d of snapNull.docs) await deleteDoc(d.ref);
@@ -384,7 +385,7 @@ function ListCard({
     d.setDate(d.getDate() + 1);
     d.setHours(0, 0, 0, 0);
     return d.toISOString().slice(0, 10);
-    };
+  };
 
   return (
     <Card className="p-0 overflow-hidden relative">
@@ -678,9 +679,7 @@ function RecurrenceModal({
   const [unit, setUnit] = useState<Recurrence['unit']>(initial.unit);
   const [starts, setStarts] = useState<string>(initial.starts);
   const [time, setTime] = useState<string | ''>(initial.time ?? '');
-  const [endsType, setEndsType] = useState<'never' | 'on' | 'after'>(
-    initial.ends.type
-  );
+  const [endsType, setEndsType] = useState<'never' | 'on' | 'after'>(initial.ends.type);
   const [endsOn, setEndsOn] = useState<string>(
     initial.ends.type === 'on' ? (initial.ends as any).date : ''
   );
