@@ -1,0 +1,28 @@
+Projects & Tasks
+O List todays tasks above the days in the big calendar, just like on google tasks. 
+  Max 3 tasks in front and rest stack behind and have a button to open them up in 
+  the big calendar
+O Tasks keep the colours in the big calendar.
+O A small "Completed" drop down displaying all completed tasks in that list
+O Make sure tasks sync with all other pages displaying tasks
+
+Calendar
+O Create events in the calendar, as well as tasks.
+O Make the events creation VERY customizable
+O Make sure the look nice and super smooth.
+O Group into categories with different colours
+O Make it possible to have several calendars (soon to share with others), and have
+  subcategorizing beneath differenciated with colours
+O Make sure tasks sync with all other pages showing tasks
+O Cross off tasks in the big calendar, click the task, opens a pop up (just like
+  in google calendar, and gives options to edit, delete and mark as complete)
+
+Budget
+O Double check it and make sure every button on the page actually works
+O Show a big title of the current month selected and keep every month saved for a
+  max of 1 year back in time.
+O Display the tasks that give points, that are in the budget program
+O Make sure it syncs with all the other pages displaying tasks
+
+Overall
+O Dark theme
