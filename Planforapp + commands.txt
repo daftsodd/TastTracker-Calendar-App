@@ -1,3 +1,15 @@
+
+Start session
+git fetch origin
+git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
+git clean -nd
+git clean -fd
+
+End session
+git add -A
+git commit -m "Title"
+git push
+
 Projects & Tasks
 O List todays tasks above the days in the big calendar, just like on google tasks. 
   Max 3 tasks in front and rest stack behind and have a button to open them up in 
